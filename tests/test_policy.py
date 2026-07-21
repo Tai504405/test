@@ -9,7 +9,7 @@ class TestPolicyParser(unittest.TestCase):
         policy = parse_policy_md("accounts/threads_10xlab.md")
         self.assertEqual(policy.account_id, "threads_10xlab")
         self.assertEqual(policy.threshold, 0.8)
-        self.assertEqual(policy.model_route, "gemini-1.5-flash")
+        self.assertEqual(policy.model_route, "gemini-3.5-flash")
         self.assertTrue(len(policy.constraints) > 0)
         self.assertTrue(len(policy.examples) > 0)
         self.assertTrue(len(policy.rubric) > 0)
@@ -19,13 +19,13 @@ class TestPolicyParser(unittest.TestCase):
         policy = parse_policy_md("accounts/facebook_tech.md")
         self.assertEqual(policy.account_id, "facebook_tech")
         self.assertEqual(policy.threshold, 0.75)
-        self.assertEqual(policy.model_route, "gemini-1.5-pro")
+        self.assertEqual(policy.model_route, "gemini-3.5-flash")
 
     def test_parse_valid_x_policy(self):
         policy = parse_policy_md("accounts/x_dev.md")
         self.assertEqual(policy.account_id, "x_dev")
         self.assertEqual(policy.threshold, 0.85)
-        self.assertEqual(policy.model_route, "gemini-1.5-flash")
+        self.assertEqual(policy.model_route, "gemini-3.5-flash")
 
     def test_missing_file(self):
         with self.assertRaises(PolicyValidationError) as ctx:

@@ -1,6 +1,6 @@
 # Policy: x_dev
 Threshold: 0.85
-Model Route: gemini-1.5-flash
+Model Route: gemini-3.5-flash
 
 ## Goal
 Share brief, high-impact developer hacks, command-line shortcuts, hot takes on modern tech stacks, and real-time development updates.

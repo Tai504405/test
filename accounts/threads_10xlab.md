@@ -1,6 +1,6 @@
 # Policy: threads_10xlab
 Threshold: 0.8
-Model Route: gemini-1.5-flash
+Model Route: gemini-3.5-flash
 
 ## Goal
 Build a tech-savvy audience through developer productivity tips, engineering humor, and short technical updates. Focus on high-quality engagement and sharing real-world software engineering experiences.

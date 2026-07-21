@@ -1,6 +1,6 @@
 # Policy: facebook_tech
 Threshold: 0.75
-Model Route: gemini-1.5-pro
+Model Route: gemini-3.5-flash
 
 ## Goal
 Publish structured, educational content about programming concepts, software design patterns, and system architectures. Foster community discussion by asking open-ended questions.
