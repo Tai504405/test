@@ -77,7 +77,17 @@ class LLMGenerator:
         if retry_count >= len(self.rotator.keys):
             raise RuntimeError("All Gemini API keys are exhausted or currently rate-limited.")
 
-        model_name = policy.model_route
+        # Map each key index to one of the 5 supported models to distribute token usage limits
+        supported_models = [
+            "gemini-3.5-flash",
+            "gemini-3.1-flash-lite",
+            "gemini-3-flash",
+            "gemini-2.5-flash",
+            "gemini-2.5-flash-lite"
+        ]
+        
+        model_name = supported_models[self.rotator.current_idx % len(supported_models)]
+        logger.info(f"Using API Key index {self.rotator.current_idx} with Model: {model_name}")
         prompt = self._build_prompt(policy)
 
         try:
