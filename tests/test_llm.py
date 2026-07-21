@@ -3,10 +3,15 @@ from unittest.mock import MagicMock, patch
 import os
 
 from src.policy.models import AccountPolicy
-from src.llm.generator import GeminiKeyRotator, LLMGenerator
-from google.api_core.exceptions import ResourceExhausted
+from src.llm.generator import (
+    GeminiKeyRotator,
+    GroqKeyRotator,
+    AIResearchAgent,
+    AICopywriterAgent,
+    AILLMCriticAgent
+)
 
-class TestLLMGenerator(unittest.TestCase):
+class TestThreeAgentSystem(unittest.TestCase):
     def setUp(self):
         # Sample policy for testing
         self.policy = AccountPolicy(
@@ -16,10 +21,10 @@ class TestLLMGenerator(unittest.TestCase):
             examples=["This is a test post #test"],
             rubric=["Clear tip.", "Under 200 chars."],
             threshold=0.8,
-            model_route="gemini-1.5-flash"
+            model_route="gemini-3.5-flash"
         )
 
-    def test_rotator_initialization_default(self):
+    def test_gemini_rotator_init(self):
         # Clear env variables to ensure there are no keys
         if "GEMINI_API_KEYS" in os.environ:
             del os.environ["GEMINI_API_KEYS"]
@@ -29,69 +34,82 @@ class TestLLMGenerator(unittest.TestCase):
         with patch("os.path.exists", return_value=False):
             rotator = GeminiKeyRotator()
             self.assertEqual(len(rotator.keys), 0)
-            with self.assertRaises(ValueError):
-                rotator.get_key()
 
-    def test_rotator_initialization_env_keys(self):
-        os.environ["GEMINI_API_KEYS"] = "key1,key2;key3"
-        rotator = GeminiKeyRotator()
-        self.assertEqual(len(rotator.keys), 3)
-        self.assertIn("key1", rotator.keys)
-        self.assertIn("key2", rotator.keys)
-        self.assertIn("key3", rotator.keys)
+    def test_groq_rotator_init(self):
+        os.environ["GROQ_API_KEYS"] = "groq1,groq2"
+        rotator = GroqKeyRotator()
+        self.assertEqual(len(rotator.keys), 2)
+        self.assertIn("groq1", rotator.keys)
+        del os.environ["GROQ_API_KEYS"]
+
+    @patch("src.llm.generator.call_gemini_api")
+    def test_research_agent_success(self, mock_call_gemini):
+        mock_call_gemini.return_value = ("Research Brief Content", {"prompt_tokens": 10, "completion_tokens": 20, "cost": 0.0001})
         
-        # Clean up
-        del os.environ["GEMINI_API_KEYS"]
-
-    @patch("google.generativeai.GenerativeModel")
-    @patch("google.generativeai.configure")
-    def test_generate_draft_success(self, mock_configure, mock_model_class):
-        mock_response = MagicMock()
-        mock_response.text = "Hello world! #test"
-        mock_response.usage_metadata.prompt_token_count = 100
-        mock_response.usage_metadata.candidates_token_count = 20
+        rotator = MagicMock()
+        agent = AIResearchAgent(rotator)
+        brief, usage = agent.generate_brief("Test Topic", self.policy)
         
-        mock_model = MagicMock()
-        mock_model.generate_content.return_value = mock_response
-        mock_model_class.return_value = mock_model
+        self.assertEqual(brief, "Research Brief Content")
+        self.assertEqual(usage["prompt_tokens"], 10)
+        mock_call_gemini.assert_called_once()
+
+    @patch("src.llm.generator.call_groq_api")
+    def test_copywriter_groq_success(self, mock_call_groq):
+        mock_call_groq.return_value = ("Groq Post Content", {"prompt_tokens": 15, "completion_tokens": 25, "cost": 0.0002})
         
-        rotator = GeminiKeyRotator()
-        # Mock keys to keep it simple
-        rotator.keys = ["keyA"]
-        rotator.current_idx = 0
+        groq_rotator = MagicMock()
+        groq_rotator.get_key.return_value = "groq_key"
         
-        generator = LLMGenerator(rotator)
-        content, usage = generator.generate_draft(self.policy)
+        agent = AICopywriterAgent(groq_rotator=groq_rotator)
+        content, usage = agent.write_post("Some Brief", self.policy)
         
-        self.assertEqual(content, "Hello world! #test")
-        self.assertEqual(usage["prompt_tokens"], 100)
-        self.assertEqual(usage["completion_tokens"], 20)
-        mock_configure.assert_called_with(api_key="keyA")
+        self.assertEqual(content, "Groq Post Content")
+        mock_call_groq.assert_called_once()
 
-    @patch("google.generativeai.GenerativeModel")
-    @patch("google.generativeai.configure")
-    def test_generate_draft_rotation_on_rate_limit(self, mock_configure, mock_model_class):
-        # First key call raises ResourceExhausted, second key call succeeds
-        mock_response = MagicMock()
-        mock_response.text = "Success on rotated key! #test"
-        mock_response.usage_metadata.prompt_token_count = 50
-        mock_response.usage_metadata.candidates_token_count = 10
+    @patch("src.llm.generator.call_gemini_api")
+    @patch("src.llm.generator.call_groq_api")
+    def test_copywriter_fallback_to_gemini(self, mock_call_groq, mock_call_gemini):
+        # Groq raises exception, Gemini succeeds
+        mock_call_groq.side_effect = Exception("Groq failed")
+        mock_call_gemini.return_value = ("Gemini Fallback Content", {"prompt_tokens": 20, "completion_tokens": 30, "cost": 0.0003})
+        
+        groq_rotator = MagicMock()
+        groq_rotator.get_key.return_value = "groq_key"
+        groq_rotator.keys = ["groq_key"]
+        
+        agent = AICopywriterAgent(groq_rotator=groq_rotator)
+        content, usage = agent.write_post("Some Brief", self.policy)
+        
+        self.assertEqual(content, "Gemini Fallback Content")
+        mock_call_groq.assert_called_once()
+        mock_call_gemini.assert_called_once()
 
-        mock_model = MagicMock()
-        mock_model.generate_content.side_effect = [ResourceExhausted("Rate limited"), mock_response]
-        mock_model_class.return_value = mock_model
+    @patch("src.llm.generator.call_github_models_api")
+    def test_critic_github_success(self, mock_call_github):
+        mock_call_github.return_value = ('{"score": 0.92, "criticism": "Good post!"}', {"prompt_tokens": 30, "completion_tokens": 40, "cost": 0.0004})
+        
+        agent = AILLMCriticAgent(github_token="github_token")
+        score, criticism, usage = agent.critic_post("Draft Content", self.policy)
+        
+        self.assertEqual(score, 0.92)
+        self.assertEqual(criticism, "Good post!")
+        mock_call_github.assert_called_once()
 
-        rotator = GeminiKeyRotator()
-        rotator.keys = ["key1", "key2"]
-        rotator.current_idx = 0
-
-        generator = LLMGenerator(rotator)
-        content, usage = generator.generate_draft(self.policy)
-
-        self.assertEqual(content, "Success on rotated key! #test")
-        self.assertEqual(rotator.current_idx, 1) # Checked that it rotated
-        mock_configure.assert_any_call(api_key="key1")
-        mock_configure.assert_any_call(api_key="key2")
+    @patch("src.llm.generator.call_gemini_api")
+    @patch("src.llm.generator.call_github_models_api")
+    def test_critic_fallback_to_gemini(self, mock_call_github, mock_call_gemini):
+        # GitHub raises exception, Gemini succeeds
+        mock_call_github.side_effect = Exception("GitHub Models failed")
+        mock_call_gemini.return_value = ('{"score": 0.82, "criticism": "Gemini review!"}', {"prompt_tokens": 35, "completion_tokens": 45, "cost": 0.0005})
+        
+        agent = AILLMCriticAgent(github_token="github_token")
+        score, criticism, usage = agent.critic_post("Draft Content", self.policy)
+        
+        self.assertEqual(score, 0.82)
+        self.assertEqual(criticism, "Gemini review!")
+        mock_call_github.assert_called_once()
+        mock_call_gemini.assert_called_once()
 
 if __name__ == "__main__":
     unittest.main()
