@@ -30,6 +30,9 @@ class SqliteCursorWrapper:
     def __iter__(self):
         return iter(self.cursor)
 
+    def __getattr__(self, name):
+        return getattr(self.cursor, name)
+
 class PostgresCursorWrapper:
     def __init__(self, cursor):
         self.cursor = cursor
@@ -70,6 +73,9 @@ class PostgresCursorWrapper:
         
     def __iter__(self):
         return iter(self.cursor)
+
+    def __getattr__(self, name):
+        return getattr(self.cursor, name)
 
 class HybridConnection:
     def __init__(self, conn, is_postgres=False):
