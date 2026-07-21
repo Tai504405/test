@@ -1,0 +1,28 @@
+{
+  "critic_id": "33333333-3333-4333-8333-333333333333",
+  "draft_id": "22222222-2222-4222-8222-222222222222",
+  "account_id": "responsible-ai-lab",
+  "rule_passed": true,
+  "score": 92,
+  "violations": [],
+  "suggestions": [
+    "Keep the concise checklist structure."
+  ],
+  "decision": "pass",
+  "metadata": {
+    "provider": "github_models",
+    "model": "openai/gpt-4o-mini",
+    "role": "critic",
+    "prompt_version": "critic-probe-v1.0.0",
+    "provider_sdk": "fixture/1.0",
+    "latency_ms": 1,
+    "usage": {
+      "input_tokens": 220,
+      "output_tokens": 60,
+      "total_tokens": 280,
+      "estimated_cost_usd": null
+    },
+    "request_id": "fixture-critic",
+    "generated_at": "2026-07-20T00:00:00Z"
+  }
+}

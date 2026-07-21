@@ -1,0 +1,31 @@
+{
+  "account_id": "responsible-ai-lab",
+  "goal": "Teach small teams practical and responsible ways to use AI.",
+  "audience": "Startup founders and content leads",
+  "platform": "LinkedIn",
+  "tone": "Practical, calm, and evidence-aware",
+  "language": "English",
+  "constraints": [
+    "Do not promise guaranteed business results",
+    "State uncertainty when evidence is limited",
+    "Keep the post under 900 characters"
+  ],
+  "banned_terms": [
+    "revolutionary",
+    "guaranteed"
+  ],
+  "required_hashtags": [
+    "#ResponsibleAI"
+  ],
+  "examples": [
+    "Start small, measure outcomes, and keep a human accountable."
+  ],
+  "rubric": {
+    "policy_compliance": 40,
+    "clarity": 25,
+    "usefulness": 25,
+    "originality": 10
+  },
+  "threshold": 80,
+  "max_length": 900
+}

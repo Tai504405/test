@@ -1,0 +1,9 @@
+{
+  "draft_id": "not-a-uuid",
+  "account_id": "",
+  "rule_passed": true,
+  "score": 120,
+  "violations": [],
+  "suggestions": [],
+  "decision": "publish"
+}
