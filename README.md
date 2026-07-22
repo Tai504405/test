@@ -1,270 +1,97 @@
-# AI-01 Provider Spike — Day 1 (Trọng)
+# Multi-Platform SocialContent Agent System
 
-This folder is a merge-safe overlay for the `Content_Agent_System` repository.
-It implements Trọng's Day 1 deliverable without taking over Tín's repository,
-CLI, database, logging, or CI ownership.
+Hệ thống tự động sinh bài viết mạng xã hội (Multi-Platform SocialContent Agent System) được xây dựng theo mô hình **CLI-first batch pipeline** kết hợp với **Streamlit Human Review Dashboard** giúp duyệt, chỉnh sửa bài viết trước khi xuất bản. 
 
-## Day 1 goal
+Dự án được tối ưu hóa hoàn toàn để vận hành trên các môi trường miễn phí (**GitHub Actions** cho việc chạy định kỳ, **Supabase PostgreSQL Free Tier** cho việc lưu trữ, và **Streamlit Community Cloud** cho giao diện quản trị).
 
-Prove that the three free-tier providers can return validated structured JSON,
-freeze a provider adapter contract, propose the Research/Copywriter/Critic model
-routes, and hand a stable error taxonomy to Tín.
+## 🚀 Tính năng cốt lõi
 
-## What is included
+1. **Policy Parser & Validator (`src/policy/`)**: Đọc và kiểm tra cấu trúc chính sách từ file Markdown (`accounts/*.md`). Có thông báo lỗi chi tiết giúp dễ dàng sửa đổi.
+2. **Zero-Token Rule Critic (`src/critic/`)**: Quét lỗi vi phạm luật cứng (độ dài, từ cấm, hashtag, số lượng emoji, liên kết...) bằng Regex, không tốn Token AI.
+3. **LLM Generator (`src/llm/`)**: Sử dụng **Gemini 1.5 Flash (Free tier)** để tự động sinh bài viết nháp dựa trên chính sách. Tích hợp cơ chế tự động xoay vòng **10 API Keys** để tránh giới hạn băng thông (Rate limits) và tự động viết lại (Rewrite) tối đa 3 lần nếu vi phạm luật cứng.
+4. **Hybrid Database Layer (`src/database/`)**: Tự động chuyển đổi giữa **SQLite** (khi chạy local/kiểm thử) và **Supabase PostgreSQL** (khi chạy deploy) thông qua biến môi trường.
+5. **Streamlit Dashboard (`src/ui/app.py`)**: Giao diện duyệt bài viết trực quan, hỗ trợ chỉnh sửa trực tiếp, tự động quét lại luật cứng khi lưu và xem thống kê chi phí, token tiêu thụ.
 
-- Pydantic contracts for `ResearchBrief`, `DraftPost`, and `CriticResult`.
-- A provider-independent adapter interface.
-- Gemini, Groq, and GitHub Models SDK-backed adapters.
-- Primary/fallback model registry.
-- A live spike command that never logs API keys.
-- Offline unit tests for schemas, error normalization, and fallback routing.
-- The provider decision record and team handoff checklist.
+---
 
-## Merge order
+## 🛠️ Hướng dẫn cài đặt local
 
-1. Wait until Tín pushes the repository bootstrap to `main`.
-2. Pull `main` and create Trọng's branch:
+### 1. Cài đặt môi trường
+Yêu cầu Python 3.10 trở lên.
+```bash
+pip install -r requirements.txt
+```
 
-   ```powershell
-   git switch main
-   git pull origin main
-   git switch -c feature/ai-01-provider-spike
+### 2. Chạy thử nghiệm CLI (Local SQLite)
+Mặc định hệ thống sẽ khởi tạo và lưu trữ kết quả tại SQLite file `database.db`:
+```bash
+# Chạy tạo bài viết cho một tài khoản cụ thể
+python run.py --account x_dev
+
+# Chạy tạo bài viết cho TẤT CẢ các tài khoản
+python run.py --all
+```
+
+### 3. Chạy giao diện Streamlit Dashboard cục bộ
+```bash
+streamlit run src/ui/app.py
+```
+
+### 4. Chạy bộ kiểm thử tự động (Unit Tests)
+```bash
+python -m unittest discover -s tests
+```
+
+---
+
+## ☁️ Hướng dẫn Deploy miễn phí 100%
+
+### Bước 1: Khởi tạo database trên Supabase (Miễn phí)
+1. Đăng ký tài khoản tại [Supabase](https://supabase.com/).
+2. Tạo một Project mới (chọn PostgreSQL miễn phí).
+3. Vào phần **Project Settings** -> **Database** -> Copy đường dẫn kết nối tại **Connection String** (Dạng URI, ví dụ: `postgresql://postgres:[password]@db.[id].supabase.co:5432/postgres`).
+
+### Bước 2: Deploy Streamlit Dashboard lên Streamlit Community Cloud
+1. Đăng ký tài khoản tại [Streamlit Share](https://share.streamlit.io/) kết nối với GitHub.
+2. Bấm **Create App** -> Chọn Repository chứa dự án của bạn -> Chọn nhánh -> Nhập đường dẫn File chính là `src/ui/app.py`.
+3. Mở phần **Advanced Settings** -> Dán cấu hình biến môi trường kết nối database vào mục **Secrets**:
+   ```toml
+   DATABASE_URL = "postgresql://postgres:[password]@db.[id].supabase.co:5432/postgres"
    ```
+4. Bấm **Deploy**. Trang Dashboard của bạn sẽ trực tuyến 24/7.
 
-3. Copy the contents of this overlay into the repository root. If Tín chose a
-   package name other than `content_agent`, keep Tín's name and move the files
-   under that package instead.
-4. Add `pydantic>=2.8,<3` to Tín's `pyproject.toml`. Do not replace Tín's file
-   with a second project configuration.
+### Bước 3: Cấu hình GitHub Actions tự động chạy định kỳ
+1. Đẩy mã nguồn lên một Repository GitHub của bạn.
+2. Vào mục **Settings** -> **Secrets and variables** -> **Actions** -> Chọn **New repository secret**.
+3. Thêm 2 Secrets sau:
+   * `DATABASE_URL`: Đường dẫn Connection String PostgreSQL Supabase của bạn.
+   * `GEMINI_API_KEYS`: Danh sách các API key của bạn, phân cách bằng dấu phẩy (ví dụ: `key1,key2,key3`).
+4. GitHub Actions sẽ tự động chạy theo lịch Cron (mặc định cấu hình tại `.github/workflows/run_pipeline.yml` là 8:00 sáng hàng ngày) hoặc bạn có thể kích hoạt chạy thủ công qua tab **Actions** -> **Run workflow**.
 
-## Team setup and credential ownership
+---
 
-Every teammate must use their **own** free-tier credentials for live testing.
-Do not copy Trọng's `.env`, reuse another member's token, or send a credential
-through chat, email, screenshots, issues, pull requests, logs, or artifacts.
-Offline tests do not require any credentials.
+## 📂 Cấu trúc thư mục dự án
 
-Create the credentials below before running the live checks:
-
-| Role | Credential to create | Primary model | Required access |
-|---|---|---|---|
-| Research | [Gemini API key in Google AI Studio](https://aistudio.google.com/apikey) | `gemini-3.1-flash-lite` | Use a Gemini Developer API free-tier project |
-| Copywriter | [Groq API key](https://console.groq.com/keys) | `llama-3.3-70b-versatile` | Use the Groq Free Plan and confirm the model on the account Limits page |
-| Critic | [GitHub fine-grained PAT](https://github.com/settings/personal-access-tokens/new) | `openai/gpt-4o-mini` | Set **Account permissions → Models → Read-only**; repository permission is not required for direct inference |
-
-Pinned fallbacks are `gemini-3.5-flash`, `qwen/qwen3.6-27b`, and
-`openai/gpt-4.1-mini`. Do not test fallbacks during normal verification because
-that consumes extra requests. The Groq primary is scheduled to shut down for
-free/developer tiers on 16 August 2026, so the Qwen fallback is the planned
-post-sprint replacement.
-
-Use free-tier accounts/projects and do not select Groq Flex, paid Gemini
-features, Gemini Search grounding, or paid GitHub Models usage for this Day 1
-test. Provider billing settings are controlled in each teammate's account, not
-by the API token itself.
-
-## Local setup on Windows
-
-Run these commands from the repository root.
-
-PowerShell:
-
-```powershell
-py -3.12 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements-ai.txt
-Copy-Item .env.ai.example .env
 ```
-
-Command Prompt (`cmd.exe`):
-
-```cmd
-py -3.12 -m venv .venv
-.venv\Scripts\activate.bat
-python -m pip install -r requirements-ai.txt
-copy .env.ai.example .env
+├── .github/workflows/
+│   └── run_pipeline.yml    # GitHub Actions workflow cấu hình chạy định kỳ
+├── accounts/
+│   ├── facebook_tech.md    # Hướng dẫn chính sách mẫu Facebook
+│   ├── threads_10xlab.md   # Hướng dẫn chính sách mẫu Threads
+│   └── x_dev.md            # Hướng dẫn chính sách mẫu X (Twitter)
+├── src/
+│   ├── critic/
+│   │   └── rule_critic.py  # Zero-Token Rule Critic kiểm tra luật cứng
+│   ├── database/
+│   │   └── db.py           # Bộ điều phối kết nối Hybrid SQLite/PostgreSQL
+│   ├── llm/
+│   │   └── generator.py    # Sinh nội dung LLM & Xoay vòng Gemini API key
+│   ├── policy/
+│   │   ├── models.py       # Pydantic models của Account Policy
+│   │   └── parser.py       # Trình phân tích cú pháp Policy Markdown
+│   └── ui/
+│       └── app.py          # Code giao diện Streamlit Dashboard
+├── tests/                  # Bộ Unit Tests cho toàn bộ hệ thống
+├── requirements.txt        # Các thư viện phụ thuộc
+└── run.py                  # CLI Core chính của hệ thống
 ```
-
-Open `.env` locally and fill in the three credentials. Keep these exact model
-IDs unless the provider matrix is deliberately updated:
-
-```dotenv
-GEMINI_API_KEY=<your-own-gemini-key>
-GEMINI_MODEL=gemini-3.1-flash-lite
-
-GROQ_API_KEY=<your-own-groq-key>
-GROQ_MODEL=llama-3.3-70b-versatile
-
-GITHUB_MODELS_TOKEN=<your-own-fine-grained-github-pat>
-GITHUB_MODELS_MODEL=openai/gpt-4o-mini
-```
-
-Never commit `.env`. The repository tracks only `.env.ai.example`, whose
-credential values are blank.
-
-## Day 1 verification for Tín and Tài
-
-Run the checks in this order from the activated virtual environment.
-
-### `provider_spike.py` test command reference
-
-Use this single script for every provider connectivity and structured-output
-check:
-
-| Test purpose | Command | API requests | Artifact |
-|---|---|---:|---|
-| Inspect configured routes only | `python scripts/provider_spike.py --dry-run` | 0 | `artifacts/provider_spike_results.json` |
-| Quick GitHub connection/JSON smoke | `python scripts/provider_spike.py --provider github_models --smoke` | 1 GitHub | `artifacts/github_models_smoke.json` |
-| Formal Gemini Research contract | `python scripts/provider_spike.py --provider gemini` | 1 Gemini | `artifacts/provider_spike_results.json` |
-| Formal Groq Copywriter contract | `python scripts/provider_spike.py --provider groq` | 1 Groq | `artifacts/provider_spike_results.json` |
-| Formal GitHub Critic contract | `python scripts/provider_spike.py --provider github_models` | 1 GitHub | `artifacts/provider_spike_results.json` |
-| Full Day 1 provider evidence | `python scripts/provider_spike.py --provider all` | 3 total | `artifacts/provider_spike_results.json` |
-| Primary and fallback validation | `python scripts/provider_spike.py --provider all --include-fallbacks` | 6 total | `artifacts/provider_spike_results.json` |
-
-Use `--output <path>` when you need to preserve an earlier artifact, for
-example:
-
-```cmd
-python scripts/provider_spike.py --provider gemini --output artifacts/gemini_check.json
-```
-
-Recommended order for normal review:
-
-```cmd
-python scripts/provider_spike.py --dry-run
-python scripts/provider_spike.py --provider github_models --smoke
-python scripts/provider_spike.py --provider all
-```
-
-The `--smoke` flag must be used with `--provider github_models`; it cannot be
-combined with `--dry-run` or `--include-fallbacks`.
-
-### 1. Inspect routes without spending quota
-
-```cmd
-python scripts/provider_spike.py --dry-run
-```
-
-Expected: Research, Copywriter, and Critic routes show `configured` with the
-three primary model IDs above.
-
-### 2. Run the offline contract and security suite
-
-```cmd
-python -m unittest discover -s tests -v
-```
-
-Expected final lines:
-
-```text
-Ran 20 tests
-OK
-```
-
-These tests validate the ResearchBrief, DraftPost, CriticResult, valid/invalid
-fixtures, policy conditioning, provider separation, usage metadata, safe error
-normalization, malformed JSON handling, and the no-secret rule. They consume no
-provider quota.
-
-### 3. Validate all three live providers
-
-```cmd
-python scripts/provider_spike.py --provider all
-```
-
-Expected status table:
-
-```text
-research     gemini           primary      passed       gemini-3.1-flash-lite
-copywriter   groq             primary      passed       llama-3.3-70b-versatile
-critic       github_models    primary      passed       openai/gpt-4o-mini
-```
-
-This consumes one request per primary provider. It writes
-`artifacts/provider_spike_results.json`; each response is counted as passed only
-after local Pydantic validation.
-
-Optional: when diagnosing only the GitHub Models credential/model, use the
-lightweight smoke mode in the same `provider_spike.py` command instead of
-spending quota on all three providers:
-
-```cmd
-python scripts/provider_spike.py --provider github_models --smoke
-```
-
-It checks that GitHub Models returns valid JSON with `caption`, `hashtags`, and
-`cta`, then writes `artifacts/github_models_smoke.json`. This is a connection
-diagnostic inside the formal provider-spike tool; the normal Critic contract is
-still validated by `--provider all`.
-
-### 4. Validate the integrated Research → Copywriter handoff
-
-```cmd
-python scripts/ai_day1_demo.py
-```
-
-Expected summary:
-
-```text
-Account: responsible-ai-lab
-Research: gemini/gemini-3.1-flash-lite
-Copywriter: groq/llama-3.3-70b-versatile
-Draft: ...
-```
-
-This consumes one Gemini and one Groq request. It writes
-`artifacts/ai_day1_demo.json` and proves that the Groq draft references the
-exact Gemini research object through `brief_id`.
-
-### 5. Owner-specific sign-off
-
-- **Tín:** confirm `run_research_copywriter()` is callable by the orchestrator,
-  `DraftPost.brief_id` matches `ResearchBrief.brief_id`, and
-  `ProviderError.as_dict()` fits the planned `RunEvent` error fields.
-- **Tài:** confirm `PolicyContext.from_policy()` accepts the real
-  `AccountPolicy`, the generated draft reflects its goal/tone/constraints, and
-  the shared `CriticResult` fields fit Policy Spec v0.1.
-- **Both:** confirm no credential appears in `git status`, the PR diff, terminal
-  output, or either runtime artifact.
-
-Do not run the following command during routine verification; it consumes
-additional free-tier requests and is only for an explicit fallback check:
-
-```cmd
-python scripts/provider_spike.py --provider all --include-fallbacks
-```
-
-Common failures:
-
-- `missing_credential`: the matching key/token is absent from `.env`.
-- `authentication`: the credential is invalid or expired.
-- GitHub `permission_denied`: recreate/edit the fine-grained PAT with
-  **Models: Read-only**.
-- `unavailable_model`: verify the exact provider-prefixed model ID.
-- `rate_limit`: wait for the free-tier limit to reset; do not switch to paid
-  usage solely to pass this spike.
-
-## Commit and open the PR
-
-```powershell
-git add src/content_agent/ai scripts/provider_spike.py scripts/ai_day1_demo.py `
-  tests docs/ai requirements-ai.txt .env.ai.example .gitignore README.md
-git commit -m "feat(ai): add provider spike and structured contracts"
-git push -u origin feature/ai-01-provider-spike
-```
-
-PR title: `AI-01: Provider spike, structured contracts, and model routing`
-
-Before requesting review, paste the actual pass/fail table from
-`artifacts/provider_spike_results.json` into the PR description. Do not commit
-that runtime artifact unless the team explicitly wants test evidence versioned.
-
-## Definition of done
-
-- Gemini, Groq, and GitHub Models each return schema-valid JSON at least once.
-- The chosen primary/fallback routes are documented.
-- Missing credentials, auth, quota, timeout, provider, model, content, and
-  schema failures have normalized codes.
-- Tín confirms the error fields fit `RunEvent`.
-- Tài confirms the shared `CriticResult` fields fit Policy Spec v0.1.
-- Offline tests pass and no secret is present in the diff.
