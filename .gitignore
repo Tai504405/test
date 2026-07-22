@@ -15,6 +15,7 @@ database.db
 database.db-journal
 artifacts/
 scratch/
+outputs/
 
 # IDEs and Editors
 .vscode/
