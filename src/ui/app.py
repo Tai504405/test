@@ -127,10 +127,10 @@ if menu == "📥 Hàng Đợi Duyệt Bài":
     conn = get_db_connection(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT r.id, r.account_id, r.model_route, r.created_at, d.id as draft_id, d.content, d.rewrite_attempt, d.score
+        SELECT r.id, r.account_id, r.model_route, r.status as run_status, r.created_at, d.id as draft_id, d.content, d.rewrite_attempt, d.score
         FROM runs r
         JOIN drafts d ON r.id = d.run_id
-        WHERE r.status = 'HUMAN_REVIEW'
+        WHERE r.status IN ('HUMAN_REVIEW', 'APPROVED')
           AND d.rewrite_attempt = (
               SELECT MAX(rewrite_attempt) 
               FROM drafts 
@@ -157,7 +157,10 @@ if menu == "📥 Hàng Đợi Duyệt Bài":
             st.info("Không có bài viết nào thuộc tài khoản này.")
         else:
             # Dropdown to select a run to review
-            run_options = {f"[{item['account_id']}] Lượt #{item['id']} - Tạo lúc: {item['created_at']}": item for item in filtered_items}
+            run_options = {
+                f"[{'🟢 AI Đạt' if item['run_status'] == 'APPROVED' else '🔴 AI Cảnh báo'}] [{item['account_id']}] Lượt #{item['id']} - {item['created_at']}": item 
+                for item in filtered_items
+            }
             selected_option = st.selectbox("Chọn bài viết cần duyệt", list(run_options.keys()), key="select_run_option")
             selected_item = run_options[selected_option]
 
@@ -219,11 +222,11 @@ if menu == "📥 Hàng Đợi Duyệt Bài":
                                       json.dumps(rule_res.violation_codes), 
                                       draft_id))
                         
-                        # Set run status to APPROVED
-                        cur.execute("UPDATE runs SET status = 'APPROVED', updated_at = ? WHERE id = ?", (now_str, run_id))
+                        # Set run status to PUBLISHED (Human Approved & Published)
+                        cur.execute("UPDATE runs SET status = 'PUBLISHED', updated_at = ? WHERE id = ?", (now_str, run_id))
                         conn.commit()
                         conn.close()
-                        st.success(f"Đã duyệt và chuyển trạng thái bài viết #{run_id} sang APPROVED!")
+                        st.success(f"🎉 Đã duyệt và xuất bản bài viết #{run_id} (Trạng thái: PUBLISHED)!")
                         st.rerun()
 
                 with btn_col2:
