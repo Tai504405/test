@@ -10,6 +10,7 @@ from src.database.db import init_db, get_db_connection
 from src.policy.parser import parse_policy_md
 from src.policy.models import PolicyValidationError
 from src.critic.rule_critic import RuleCritic
+from src.publisher.mock_publisher import MockPublisher
 from src.llm.generator import (
     GeminiKeyRotator,
     GroqKeyRotator,
@@ -219,6 +220,12 @@ def process_account(account_id: str, topic: str = None, db_path: str = "database
         conn.commit()
         conn.close()
         logger.info(f"✔️ Đã lưu kết quả thành công vào Database (Run ID: {run_id}, Trạng thái: {run_status}).")
+        
+        # 6. Chạy Publisher Agent (Mock export) nếu bài viết ĐẠT
+        if passed:
+            publisher = MockPublisher()
+            publisher.publish(policy.account_id, content, metadata={"run_id": run_id, "score": llm_score})
+            
         return True
 
     except Exception as e:

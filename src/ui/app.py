@@ -14,6 +14,7 @@ from src.database.db import get_db_connection, seed_mock_data, init_db
 from src.policy.parser import parse_policy_md
 from src.policy.models import PolicyValidationError
 from src.critic.rule_critic import RuleCritic
+from src.publisher.mock_publisher import MockPublisher
 
 # ----------------------------------------------------
 # 1. SETUP PAGE STYLES & CONFIG
@@ -226,7 +227,12 @@ if menu == "📥 Hàng Đợi Duyệt Bài":
                         cur.execute("UPDATE runs SET status = 'PUBLISHED', updated_at = ? WHERE id = ?", (now_str, run_id))
                         conn.commit()
                         conn.close()
-                        st.success(f"🎉 Đã duyệt và xuất bản bài viết #{run_id} (Trạng thái: PUBLISHED)!")
+                        
+                        # Trigger MockPublisher export
+                        publisher = MockPublisher()
+                        publisher.publish(account_id, edited_content, metadata={"run_id": run_id, "score": score})
+                        
+                        st.success(f"🎉 Đã duyệt và xuất bản bài viết #{run_id} (Publisher Mock exported)!")
                         st.rerun()
 
                 with btn_col2:

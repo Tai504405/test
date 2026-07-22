@@ -208,26 +208,36 @@ def call_github_models_api(prompt: str, token: str) -> tuple[str, dict]:
 # ====================================================
 
 class AIResearchAgent:
-    """Agent 1: Researches the topic and outlines a Research Brief."""
+    """Agent 1: Researches the topic and outlines a structured JSON Research Brief based on account domain."""
     def __init__(self, gemini_rotator: GeminiKeyRotator = None, groq_rotator: GroqKeyRotator = None):
         self.gemini_rotator = gemini_rotator or GeminiKeyRotator()
         self.groq_rotator = groq_rotator or GroqKeyRotator()
 
     def generate_brief(self, topic: str, policy: AccountPolicy) -> tuple[str, dict]:
+        topic_clause = f"Chủ đề yêu cầu: {topic}" if topic else f"Tự động tìm kiếm chủ đề kỹ thuật hot nhất theo mục tiêu kênh: {policy.goal}"
         prompt = f"""Bạn là một trợ lý nghiên cứu AI (AI Research Agent).
-Nhiệm vụ của bạn là lập một bản tóm tắt nghiên cứu (Research Brief) cho chủ đề dưới đây nhằm chuẩn bị cho việc viết bài mạng xã hội cho kênh "{policy.account_id}".
+Nhiệm vụ của bạn là tìm kiếm insight và lập một bản tóm tắt nghiên cứu (Research Brief) cho kênh "{policy.account_id}".
 
-=== CHỦ ĐỀ YÊU CẦU (TOPIC) ===
-{topic}
+=== MỤC TIÊU KÊNH (DOMAIN) ===
+{policy.goal}
 
-=== YÊU CẦU ĐẦU RA ===
-- Phân tích sâu chủ đề, liệt kê các thông tin kỹ thuật cốt lõi, từ khóa quan trọng và cấu trúc bài viết được khuyến nghị.
-- Bản tóm tắt phải súc tích, chi tiết và có ích cho người viết nội dung (Copywriter).
-- Trả về văn bản thuần túy của bản tóm tắt, không thêm các lời chào hỏi hay các thông tin thừa khác ngoài nội dung brief.
+=== YÊU CẦU CHỦ ĐỀ ===
+{topic_clause}
+
+=== YÊU CẦU ĐẦU RA (ĐỊNH DẠNG JSON DUY NHẤT) ===
+Trả về một JSON duy nhất theo cấu trúc:
+{{
+  "topic": "<Tên chủ đề được xác định>",
+  "key_insights": ["<Insight/Kiến thức kỹ thuật 1>", "<Insight/Kiến thức kỹ thuật 2>"],
+  "target_audience": "<Đối tượng đọc>",
+  "suggested_structure": "<Cấu trúc bài viết được khuyến nghị>"
+}}
+Không thêm bất kỳ văn bản nào ngoài khối JSON.
 """
-        logger.info(f"AI Research Agent: Đang lập dàn ý nghiên cứu cho chủ đề: '{topic}'")
+        logger.info(f"AI Research Agent: Đang lập JSON Research Brief cho kênh '{policy.account_id}' (Topic: '{topic or 'Auto-Discover'}')...")
         try:
-            return call_gemini_api(prompt, self.gemini_rotator, "gemini-3.1-flash-lite")
+            content, usage = call_gemini_api(prompt, self.gemini_rotator, "gemini-3.1-flash-lite")
+            return content, usage
         except Exception as e:
             logger.warning(f"AI Research Agent: Gemini gặp lỗi ({str(e)}). Fallback sang Groq API...")
             groq_key = self.groq_rotator.get_key()
@@ -319,7 +329,8 @@ Nhiệm vụ của bạn là chấm điểm bài viết mạng xã hội nháp d
 Hãy trả về kết quả dưới định dạng JSON duy nhất. Cấu trúc JSON bắt buộc phải như sau:
 {{
   "score": <float từ 0.0 đến 1.0 đại diện cho điểm số trung bình cộng dựa trên rubrics>,
-  "criticism": "<Các lời nhận xét chi tiết, chỉ ra điểm chưa đạt về văn phong và các gợi ý sửa đổi bằng tiếng Việt>"
+  "violations": ["<Các điểm chưa đạt về văn phong/rubric 1>", "<Các điểm chưa đạt 2>"],
+  "suggestions": ["<Gợi ý sửa đổi 1>", "<Gợi ý sửa đổi 2>"]
 }}
 Chú ý:
 - KHÔNG thêm bất kỳ văn bản giải thích nào ngoài khối JSON.
@@ -332,7 +343,21 @@ Chú ý:
                 cleaned = re.sub(r"\n```$", "", cleaned)
                 cleaned = cleaned.strip()
             data = json.loads(cleaned)
-            return float(data["score"]), str(data["criticism"])
+            score = float(data.get("score", 0.70))
+            if "criticism" in data:
+                return score, str(data["criticism"])
+                
+            violations = data.get("violations", [])
+            suggestions = data.get("suggestions", [])
+            
+            criticism_parts = []
+            if violations:
+                criticism_parts.append(f"Lỗi văn phong/rubric: {'; '.join(violations)}")
+            if suggestions:
+                criticism_parts.append(f"Gợi ý sửa đổi: {'; '.join(suggestions)}")
+                
+            criticism = " | ".join(criticism_parts) if criticism_parts else "Bài viết đạt tiêu chí chất lượng tốt."
+            return score, criticism
 
         # 1. Try GitHub Models first
         if self.github_token:
