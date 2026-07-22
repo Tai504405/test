@@ -207,34 +207,52 @@ def call_github_models_api(prompt: str, token: str) -> tuple[str, dict]:
 # 3. 3-AGENT IMPLEMENTATION CLASSES
 # ====================================================
 
+from typing import Optional, List, Dict, Any
+
 class AIResearchAgent:
-    """Agent 1: Researches the topic and outlines a structured JSON Research Brief based on account domain."""
+    """Agent 1: Researches topic or auto-discovers ideas according to policy domain, returning a structured JSON Brief."""
     def __init__(self, gemini_rotator: GeminiKeyRotator = None, groq_rotator: GroqKeyRotator = None):
         self.gemini_rotator = gemini_rotator or GeminiKeyRotator()
         self.groq_rotator = groq_rotator or GroqKeyRotator()
 
-    def generate_brief(self, topic: str, policy: AccountPolicy) -> tuple[str, dict]:
-        topic_clause = f"Chủ đề yêu cầu: {topic}" if topic else f"Tự động tìm kiếm chủ đề kỹ thuật hot nhất theo mục tiêu kênh: {policy.goal}"
+    def generate_brief(self, topic: Optional[str] = None, policy: Optional[AccountPolicy] = None) -> tuple[str, dict]:
+        # Handle flexible parameter ordering for backward compatibility
+        if isinstance(topic, AccountPolicy):
+            topic, policy = policy, topic
+
+        is_manual = bool(topic and str(topic).strip())
+        manual_topic_str = str(topic).strip() if is_manual else ""
+        account_id = policy.account_id if policy else "social_account"
+        account_goal = policy.goal if policy else "Chia sẻ kiến thức công nghệ hữu ích"
+
+        if is_manual:
+            topic_instruction = (
+                f"CHẾ ĐỘ 2 (TRUYỀN ĐỀ TÀI THỦ CÔNG): BẮT BUỘC sử dụng chính xác đề tài do người dùng chỉ định: \"{manual_topic_str}\". "
+                "Không được tự đổi sang đề tài khác."
+            )
+        else:
+            topic_instruction = (
+                f"CHẾ ĐỘ 1 (TỰ ĐỘNG TÌM ĐỀ TÀI): Người dùng KHÔNG truyền đề tài. Hãy phân tích định hướng/mục tiêu (Goal) của kênh: \"{account_goal}\", "
+                "tự động phân tích và tự nghĩ ra 1 đề tài/ý tưởng bài viết phù hợp nhất cho tài khoản này."
+            )
+
         prompt = f"""Bạn là một trợ lý nghiên cứu AI (AI Research Agent).
-Nhiệm vụ của bạn là tìm kiếm insight và lập một bản tóm tắt nghiên cứu (Research Brief) cho kênh "{policy.account_id}".
+Nhiệm vụ của bạn là lập một bản tóm tắt nghiên cứu (Research Brief) cho kênh "{account_id}".
 
-=== MỤC TIÊU KÊNH (DOMAIN) ===
-{policy.goal}
-
-=== YÊU CẦU CHỦ ĐỀ ===
-{topic_clause}
+=== ĐỊNH HƯỚNG ĐỀ TÀI ===
+{topic_instruction}
 
 === YÊU CẦU ĐẦU RA (ĐỊNH DẠNG JSON DUY NHẤT) ===
-Trả về một JSON duy nhất theo cấu trúc:
+Trả về duy nhất một khối JSON với cấu trúc chuẩn sau:
 {{
-  "topic": "<Tên chủ đề được xác định>",
-  "key_insights": ["<Insight/Kiến thức kỹ thuật 1>", "<Insight/Kiến thức kỹ thuật 2>"],
-  "target_audience": "<Đối tượng đọc>",
-  "suggested_structure": "<Cấu trúc bài viết được khuyến nghị>"
+  "topic": "{manual_topic_str if is_manual else '<Tên đề tài do AI tự sáng tạo phù hợp với domain kênh>'}",
+  "target_audience": "<Đối tượng độc giả mục tiêu>",
+  "main_points": ["<Ý chính/Insight 1>", "<Ý chính/Insight 2>", "<Ý chính/Insight 3>"],
+  "angle": "<Góc nhìn hoặc định hướng tiếp cận sắc bén của bài viết>"
 }}
-Không thêm bất kỳ văn bản nào ngoài khối JSON.
+Chú ý: KHÔNG thêm bất kỳ văn bản giải thích nào ngoài khối JSON.
 """
-        logger.info(f"AI Research Agent: Đang lập JSON Research Brief cho kênh '{policy.account_id}' (Topic: '{topic or 'Auto-Discover'}')...")
+        logger.info(f"AI Research Agent: Đang lập JSON Research Brief (Chế độ: {'Thủ công [' + manual_topic_str + ']' if is_manual else 'Tự động tìm đề tài'})...")
         try:
             content, usage = call_gemini_api(prompt, self.gemini_rotator, "gemini-3.1-flash-lite")
             return content, usage
