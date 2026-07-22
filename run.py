@@ -46,10 +46,8 @@ DEFAULT_TOPICS = [
 def process_account(account_id: str, topic: str = None, db_path: str = "database.db"):
     logger.info(f"=== Bắt đầu xử lý tài khoản: {account_id} ===")
     
-    # Select default topic if none is provided
-    if not topic:
-        topic = random.choice(DEFAULT_TOPICS)
-    logger.info(f"Chủ đề thực hiện: '{topic}'")
+    topic_display = topic if topic and topic.strip() else "AI tự động suy nghĩ & tìm kiếm chủ đề theo domain kênh"
+    logger.info(f"Chủ đề thực hiện: '{topic_display}'")
 
     # 1. Tìm và đọc file policy
     policy_path = f"accounts/{account_id}.md"

@@ -368,16 +368,26 @@ elif menu == "✨ Tạo Bài Viết Mới":
         except Exception:
             pass
 
-        topic_mode = st.radio("Lựa chọn chủ đề bài viết:", ["Chọn chủ đề mẫu từ hệ thống", "Nhập chủ đề tùy chọn mới"])
+        topic_mode = st.radio(
+            "Lựa chọn chủ đề bài viết:",
+            [
+                "🎲 Cho AI tự suy nghĩ & đề xuất chủ đề mới theo Domain kênh",
+                "Chọn chủ đề mẫu từ hệ thống",
+                "Nhập chủ đề tùy chọn mới"
+            ]
+        )
         
-        if topic_mode == "Chọn chủ đề mẫu từ hệ thống":
+        if topic_mode == "🎲 Cho AI tự suy nghĩ & đề xuất chủ đề mới theo Domain kênh":
+            topic = ""
+            st.success("🧠 **AI Research Agent** sẽ tự động phân tích mục tiêu kênh và tự suy nghĩ ra chủ đề công nghệ phù hợp nhất!")
+        elif topic_mode == "Chọn chủ đề mẫu từ hệ thống":
             topic = st.selectbox("Chọn chủ đề mẫu:", DEFAULT_TOPICS)
         else:
             topic = st.text_input("Nhập chủ đề bạn mong muốn:", placeholder="Ví dụ: Cách tối ưu hiệu năng của Python với Cython...")
 
         st.markdown("---")
         if st.button("🚀 Chạy AI Tạo Bài Viết Mới", type="primary", use_container_width=True):
-            if not topic.strip():
+            if topic_mode != "🎲 Cho AI tự suy nghĩ & đề xuất chủ đề mới theo Domain kênh" and not topic.strip():
                 st.error("Vui lòng nhập hoặc chọn chủ đề bài viết hợp lệ!")
             else:
                 with st.spinner("Đang chạy AI Agents (Research -> Copywriter -> Critic) và quét luật..."):
